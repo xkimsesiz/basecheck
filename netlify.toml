@@ -1,6 +1,11 @@
 [functions]
   directory = "netlify/functions"
 
+[[redirects]]
+  from = "/support"
+  to = "/.netlify/functions/supporter"
+  status = 200
+
 [[headers]]
   for = "/.netlify/functions/*"
   [headers.values]
