@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Basecheck</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #08080E;
+    --surface: #0F0F1C;
+    --card:    #13131F;
+    --border:  #1E1E35;
+    --accent1: #4F46E5;
+    --accent2: #7C3AED;
+    --glow:    rgba(79,70,229,0.25);
+    --text:    #EEEEFF;
+    --muted:   #7070AA;
+    --success: #22C55E;
+    --error:   #EF4444;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Space Grotesk', sans-serif; min-height: 100vh; }
+
+  .aurora {
+    position: fixed; top: -200px; left: 50%; transform: translateX(-50%);
+    width: 900px; height: 400px;
+    background: radial-gradient(ellipse at center, rgba(79,70,229,0.18) 0%, rgba(124,58,237,0.1) 40%, transparent 70%);
+    pointer-events: none; z-index: 0;
+    animation: pulse 6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:.7} 50%{opacity:1} }
+
+  .container { max-width: 880px; margin: 0 auto; padding: 0 20px 80px; position: relative; z-index: 1; }
+
+  header { display: flex; align-items: center; justify-content: space-between; padding: 28px 0 48px; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent1), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo-name { font-size: 20px; font-weight: 700; letter-spacing: -.02em; background: linear-gradient(135deg,#fff 30%,#a5b4fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+  #walletBtn { background: linear-gradient(135deg,var(--accent1),var(--accent2)); border: none; color: #fff; padding: 10px 20px; border-radius: 10px; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s,transform .1s; }
+  #walletBtn:hover { opacity: .85; transform: translateY(-1px); }
+  #walletBtn.connected { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-family: 'JetBrains Mono',monospace; font-size: 12px; }
+
+  #networkBadge { display: none; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); background: var(--card); border: 1px solid var(--border); padding: 6px 12px; border-radius: 8px; margin-right: 10px; }
+  #networkBadge.show { display: flex; }
+  .dot { width: 7px; height: 7px; background: var(--success); border-radius: 50%; animation: blink 2s ease-in-out infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+
+  .streak-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 36px; margin-bottom: 20px; position: relative; overflow: hidden; }
+  .streak-card::before { content:''; position:absolute; inset:0; background: linear-gradient(135deg,rgba(79,70,229,.06) 0%,transparent 60%); pointer-events:none; }
+  .streak-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+  .streak-number { font-size: 88px; font-weight: 700; line-height: 1; letter-spacing: -.04em; background: linear-gradient(135deg,#fff 0%,#a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .streak-label { font-size: 14px; color: var(--muted); margin-top: 6px; font-weight: 500; }
+  .streak-stats { display: flex; flex-direction: column; gap: 12px; text-align: right; }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-val { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono',monospace; }
+  .stat-key { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+
+  .gm-btn { width: 100%; margin-top: 28px; padding: 16px; background: linear-gradient(135deg,var(--accent1),var(--accent2)); border: none; border-radius: 12px; color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; letter-spacing: .04em; transition: opacity .2s,transform .1s,box-shadow .2s; }
+  .gm-btn:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 8px 32px var(--glow); }
+  .gm-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .gm-btn.done { background: var(--surface); border: 1px solid var(--border); color: var(--success); }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  @media(max-width:640px){ .grid2{ grid-template-columns:1fr; } }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 28px; }
+  .card-title { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .card-desc { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 22px; }
+
+  .deploy-step { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .step-num { width: 24px; height: 24px; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--accent1); }
+  .step-num.done { background: var(--success); border-color: var(--success); color: #fff; }
+
+  .addr-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; font-family: 'JetBrains Mono',monospace; font-size: 11px; color: var(--accent1); word-break: break-all; margin: 10px 0 16px; display: none; }
+  .addr-box.show { display: block; }
+
+  .badges-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .badge-item { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: 1; min-width: 80px; }
+  .badge-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; background: var(--surface); border: 1px solid var(--border); transition: all .3s; }
+  .badge-icon.earned { background: linear-gradient(135deg,rgba(79,70,229,.2),rgba(124,58,237,.2)); border-color: var(--accent1); box-shadow: 0 0 20px rgba(79,70,229,.25); }
+  .badge-icon.locked { filter: grayscale(1); opacity: .35; }
+  .badge-name { font-size: 11px; color: var(--muted); text-align: center; font-weight: 500; }
+
+  .btn { width: 100%; padding: 13px; border-radius: 10px; border: none; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+  .btn-primary { background: linear-gradient(135deg,var(--accent1),var(--accent2)); color: #fff; }
+  .btn-primary:hover { opacity: .85; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+  .btn-secondary { background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+  .btn-secondary:hover { border-color: var(--accent1); }
+  .btn-secondary:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* x402 Banner */
+  .x402-banner { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px 24px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .x402-info { display: flex; align-items: center; gap: 12px; }
+  .x402-icon { font-size: 24px; }
+  .x402-text { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .x402-text strong { color: var(--text); font-size: 14px; display: block; margin-bottom: 2px; }
+  .btn-x402 { white-space: nowrap; padding: 10px 20px; border-radius: 10px; border: 1px solid var(--accent1); background: transparent; color: var(--accent1); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; text-decoration: none; display: inline-block; }
+  .btn-x402:hover { background: var(--accent1); color: #fff; }
+
+  .tx-link { font-size: 12px; color: var(--accent1); font-family: 'JetBrains Mono',monospace; text-decoration: none; display: none; margin-top: 10px; word-break: break-all; }
+  .tx-link.show { display: block; }
+
+  #toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 22px; font-size: 14px; font-weight: 500; transition: transform .3s cubic-bezier(.34,1.56,.64,1); z-index: 100; max-width: 90vw; text-align: center; }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  #toast.success { border-color: var(--success); color: var(--success); }
+  #toast.error   { border-color: var(--error);   color: var(--error);   }
+  #toast.info    { border-color: var(--accent1);  color: var(--accent1); }
+</style>
+</head>
+<body>
+<div class="aurora"></div>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">✅</div>
+      <span class="logo-name">Basecheck</span>
+    </div>
+    <div style="display:flex;align-items:center">
+      <div id="networkBadge"><span class="dot"></span><span id="networkName">Base Sepolia</span></div>
+      <button id="walletBtn" onclick="connectWallet()">Connect Wallet</button>
+    </div>
+  </header>
+
+  <!-- GM STREAK -->
+  <div class="section-label">Daily Check-in</div>
+  <div class="streak-card">
+    <div class="streak-top">
+      <div>
+        <div class="streak-number" id="streakNum">—</div>
+        <div class="streak-label">day streak</div>
+      </div>
+      <div class="streak-stats">
+        <div class="stat"><span class="stat-val" id="longestNum">—</span><span class="stat-key">Longest</span></div>
+        <div class="stat"><span class="stat-val" id="totalNum">—</span><span class="stat-key">Total GMs</span></div>
+      </div>
+    </div>
+    <button class="gm-btn" id="gmBtn" onclick="checkIn()" disabled>Connect wallet to GM</button>
+    <a class="tx-link" id="gmTxLink" target="_blank"></a>
+  </div>
+
+  <!-- DEPLOY + BADGES -->
+  <div class="grid2">
+    <div class="card">
+      <div class="section-label">Deploy</div>
+      <div class="card-title">Your own contract</div>
+      <div class="card-desc">Deploy a real smart contract on Base. It's yours — stored on-chain forever.</div>
+      <div class="deploy-step"><div class="step-num" id="step1Num">1</div><span>Deploy MyGmBoard contract</span></div>
+      <div class="addr-box" id="deployedAddr"></div>
+      <div class="deploy-step"><div class="step-num" id="step2Num">2</div><span>Claim your Deploy Badge</span></div>
+      <button class="btn btn-primary" id="deployBtn" onclick="deployContract()" disabled style="margin-bottom:10px">Deploy Contract</button>
+      <button class="btn btn-secondary" id="claimBadgeBtn" onclick="claimDeployBadge()" disabled>Claim Badge</button>
+      <a class="tx-link" id="deployTxLink" target="_blank"></a>
+    </div>
+
+    <div class="card">
+      <div class="section-label">Achievements</div>
+      <div class="card-title">Badges</div>
+      <div class="card-desc">Earned on-chain. Yours forever.</div>
+      <div class="badges-grid">
+        <div class="badge-item"><div class="badge-icon locked" id="badge1">🔨</div><div class="badge-name">First Deploy</div></div>
+        <div class="badge-item"><div class="badge-icon locked" id="badge2">🔥</div><div class="badge-name">7 Day Streak</div></div>
+        <div class="badge-item"><div class="badge-icon locked" id="badge3">⚡</div><div class="badge-name">30 Day Streak</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- x402 BANNER -->
+  <div class="x402-banner">
+    <div class="x402-info">
+      <div class="x402-icon">⚡</div>
+      <div class="x402-text">
+        <strong>x402 Payments on Base</strong>
+        Experience the future of onchain micropayments — powered by Base.
+      </div>
+    </div>
+    <a class="btn-x402" href="https://x402.org" target="_blank">Try x402 →</a>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+const CHAIN_ID     = 8453;  // Base Mainnet
+const NETWORK_NAME = "Base";
+const EXPLORER     = "https://basescan.org";
+const HUB_ADDRESS  = "MAINNET_ADDRESS_PLACEHOLDER"; // nach Mainnet-Deploy eintragen
+const BUILDER_SUFFIX = ""; // nach base.dev Registrierung eintragen
+
+// ── ABIs ────────────────────────────────────────────────────────
+const HUB_ABI = [
+  "function checkIn() external",
+  "function getStreakInfo(address user) external view returns (uint256 current, uint256 longest, uint256 totalGms, bool checkedInToday)",
+  "function claimDeployBadge(address deployedContract) external",
+  "function balanceOf(address, uint256) external view returns (uint256)"
+];
+
+const GMBOARD_ABI = [
+  "constructor()",
+  "function deployer() external view returns (address)",
+  "function postGm(string calldata message) external",
+  "function gmCount() external view returns (uint256)"
+];
+
+const GMBOARD_BYTECODE = "0x60a060405234801561000f575f80fd5b503360805260805161050061002b5f395f608901526105005ff3fe608060405234801561000f575f80fd5b506004361061004a575f3560e01c80636cb5f7101461004e578063c30c9f7614610063578063d5f3948814610084578063dde6cf9c146100c3575b5f80fd5b5f546040519081526020015b60405180910390f35b610076610071366004610252565b6100d8565b60405161005a929190610269565b6100ab7f000000000000000000000000000000000000000000000000000000000000000081565b6040516001600160a01b03909116815260200161005a565b6100d66100d13660046102bb565b610198565b005b60605f805f84815481106100ee576100ee610327565b905f5260205f2090600202019050805f0181600101548180546101109061033b565b80601f016020809104026020016040519081016040528092919081815260200182805461013c9061033b565b80156101875780601f1061015e57610100808354040283529160200191610187565b820191905f5260205f20905b81548152906001019060200180831161016a57829003601f168201915b505050505091509250925050915091565b6040805160606020601f8501819004028201810183529181018381525f9282919086908690819085018382808284375f9201829052509385525050426020938401525083546001810185559381522081519192600202019081906101fc90826103d3565b50602082015181600101555050336001600160a01b03167f86a8fadba823003de692cf3986abc3bc7153b3a972ca99fb376339e144e608cf83834260405161024693929190610493565b60405180910390a25050565b5f60208284031215610262575f80fd5b5035919050565b604081525f83518060408401525f5b818110156102955760208187018101516060868401015201610278565b505f606082850101526060601f19601f8301168401019150508260208301529392505050565b5f80602083850312156102cc575f80fd5b823567ffffffffffffffff808211156102e3575f80fd5b818501915085601f8301126102f6575f80fd5b813581811115610304575f80fd5b866020828501011115610315575f80fd5b60209290920196919550909350505050565b634e487b7160e01b5f52603260045260245ffd5b600181811c9082168061034f57607f821691505b60208210810361036d57634e487b7160e01b5f52602260045260245ffd5b50919050565b634e487b7160e01b5f52604160045260245ffd5b601f8211156103ce57805f5260205f20601f840160051c810160208510156103ac5750805b601f840160051c820191505b818110156103cb575f81556001016103b8565b50505b505050565b815167ffffffffffffffff8111156103ed576103ed610373565b610401816103fb845461033b565b84610387565b602080601f831160018114610434575f841561041d5750858301515b5f19600386901b1c1916600185901b17855561048b565b5f85815260208120601f198616915b8281101561046257888601518255948401946001909101908401610443565b508582101561047f57878501515f19600388901b60f8161c191681555b505060018460011b0185555b505050505050565b60408152826040820152828460608301375f606084830101525f6060601f19601f860116830101905082602083015294935050505056fea2646970667358221220430d5fcc85eee015040cde6c79f589a50abaa8e8ba7eadb031f2f71c21d6e58b64736f6c63430008180033";
+
+// ── STATE ────────────────────────────────────────────────────────
+let provider, signer, userAddress, hubContract;
+let deployedContractAddress = null;
+
+// ── WALLET CONNECT ───────────────────────────────────────────────
+async function connectWallet() {
+  if (!window.ethereum) { showToast("MetaMask not found", "error"); return; }
+  try {
+    provider = new ethers.BrowserProvider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    const network = await provider.getNetwork();
+    if (Number(network.chainId) !== CHAIN_ID) {
+      try {
+        await window.ethereum.request({ method: "wallet_switchEthereumChain", params: [{ chainId: "0x" + CHAIN_ID.toString(16) }] });
+        provider = new ethers.BrowserProvider(window.ethereum);
+      } catch(e) { showToast("Please switch to " + NETWORK_NAME, "error"); return; }
+    }
+    signer      = await provider.getSigner();
+    userAddress = await signer.getAddress();
+    hubContract = new ethers.Contract(HUB_ADDRESS, HUB_ABI, signer);
+    const btn = document.getElementById("walletBtn");
+    btn.textContent = userAddress.slice(0,6) + "..." + userAddress.slice(-4);
+    btn.classList.add("connected");
+    document.getElementById("networkBadge").classList.add("show");
+    await loadStreakInfo();
+    await loadBadges();
+    document.getElementById("deployBtn").disabled = false;
+  } catch(e) { showToast(e.message || "Connection failed", "error"); }
+}
+
+// ── LOAD STREAK ──────────────────────────────────────────────────
+async function loadStreakInfo() {
+  try {
+    const info = await hubContract.getStreakInfo(userAddress);
+    document.getElementById("streakNum").textContent  = info.current.toString();
+    document.getElementById("longestNum").textContent = info.longest.toString();
+    document.getElementById("totalNum").textContent   = info.totalGms.toString();
+    const gmBtn = document.getElementById("gmBtn");
+    if (info.checkedInToday) {
+      gmBtn.textContent = "✓ GM sent today";
+      gmBtn.classList.add("done");
+      gmBtn.disabled = true;
+    } else {
+      gmBtn.textContent = "Send GM ✅";
+      gmBtn.classList.remove("done");
+      gmBtn.disabled = false;
+    }
+  } catch(e) { console.error(e); }
+}
+
+// ── LOAD BADGES ──────────────────────────────────────────────────
+async function loadBadges() {
+  try {
+    const [b1, b2, b3] = await Promise.all([
+      hubContract.balanceOf(userAddress, 1),
+      hubContract.balanceOf(userAddress, 2),
+      hubContract.balanceOf(userAddress, 3),
+    ]);
+    if (b1 > 0n) { setBadge("badge1", true); }
+    if (b2 > 0n) { setBadge("badge2", true); }
+    if (b3 > 0n) { setBadge("badge3", true); }
+  } catch(e) { console.error(e); }
+}
+function setBadge(id, earned) {
+  const el = document.getElementById(id);
+  el.classList.remove("locked");
+  el.classList.add(earned ? "earned" : "locked");
+}
+
+// ── CHECK IN ─────────────────────────────────────────────────────
+async function checkIn() {
+  const btn = document.getElementById("gmBtn");
+  btn.disabled = true; btn.textContent = "Sending...";
+  try {
+    const tx = await hubContract.checkIn();
+    showToast("GM sent! ✅", "success");
+    const link = document.getElementById("gmTxLink");
+    link.href = EXPLORER + "/tx/" + tx.hash;
+    link.textContent = "View tx ↗ " + tx.hash.slice(0,20) + "...";
+    link.classList.add("show");
+    await tx.wait();
+    await loadStreakInfo();
+    await loadBadges();
+  } catch(e) {
+    showToast(e.reason || e.message || "TX failed", "error");
+    btn.disabled = false; btn.textContent = "Send GM ✅";
+  }
+}
+
+// ── DEPLOY CONTRACT ───────────────────────────────────────────────
+async function deployContract() {
+  const btn = document.getElementById("deployBtn");
+  btn.disabled = true; btn.textContent = "Deploying...";
+  try {
+    const factory  = new ethers.ContractFactory(GMBOARD_ABI, GMBOARD_BYTECODE, signer);
+    const contract = await factory.deploy();
+    showToast("Deploying your contract...", "info");
+    await contract.waitForDeployment();
+    deployedContractAddress = await contract.getAddress();
+    const addrBox = document.getElementById("deployedAddr");
+    addrBox.textContent = deployedContractAddress;
+    addrBox.classList.add("show");
+    document.getElementById("step1Num").classList.add("done");
+    document.getElementById("step1Num").textContent = "✓";
+    const link = document.getElementById("deployTxLink");
+    link.href = EXPLORER + "/address/" + deployedContractAddress;
+    link.textContent = "View contract ↗ " + deployedContractAddress.slice(0,20) + "...";
+    link.classList.add("show");
+    document.getElementById("claimBadgeBtn").disabled = false;
+    btn.textContent = "Deployed ✓";
+    showToast("Contract deployed! Now claim your badge.", "success");
+  } catch(e) {
+    showToast(e.reason || e.message || "Deploy failed", "error");
+    btn.disabled = false; btn.textContent = "Deploy Contract";
+  }
+}
+
+// ── CLAIM BADGE ───────────────────────────────────────────────────
+async function claimDeployBadge() {
+  if (!deployedContractAddress) return;
+  const btn = document.getElementById("claimBadgeBtn");
+  btn.disabled = true; btn.textContent = "Claiming...";
+  try {
+    const tx = await hubContract.claimDeployBadge(deployedContractAddress);
+    showToast("Badge claimed! 🔨", "success");
+    await tx.wait();
+    document.getElementById("step2Num").classList.add("done");
+    document.getElementById("step2Num").textContent = "✓";
+    await loadBadges();
+    btn.textContent = "Badge Claimed ✓";
+  } catch(e) {
+    showToast(e.reason || e.message || "Claim failed", "error");
+    btn.disabled = false; btn.textContent = "Claim Badge";
+  }
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────
+function showToast(msg, type = "info") {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.className = "show " + type;
+  setTimeout(() => { t.className = ""; }, 4000);
+}
+
+// ── AUTO CONNECT ──────────────────────────────────────────────────
+window.addEventListener("load", async () => {
+  if (window.ethereum) {
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    if (accounts.length > 0) connectWallet();
+    window.ethereum.on("accountsChanged", () => location.reload());
+    window.ethereum.on("chainChanged",    () => location.reload());
+  }
+});
+</script>
+</body>
+</html>
