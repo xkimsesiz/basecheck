@@ -362,7 +362,8 @@ async function deployContract() {
     link.href = EXPLORER + "/address/" + deployedContractAddress;
     link.textContent = "View contract ↗ " + deployedContractAddress.slice(0,20) + "...";
     link.classList.add("show");
-    btn.textContent = "Deployed ✓";
+    btn.textContent = "Deploy Again";
+    btn.disabled = false;
     showToast("Contract deployed! Now claim your badge.", "success");
   } catch(e) {
     showToast(e.reason || e.message || "Deploy failed", "error");
