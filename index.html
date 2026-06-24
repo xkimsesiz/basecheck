@@ -61,6 +61,16 @@
   .stat-val { font-size: 22px; font-weight: 700; font-family: 'JetBrains Mono',monospace; }
   .stat-key { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 
+  .timer-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 20px; margin-top: 20px; }
+  .timer-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; margin-bottom: 10px; }
+  .timer-digits { display: flex; gap: 12px; align-items: flex-end; }
+  .timer-unit { text-align: center; }
+  .timer-num { font-size: 34px; font-weight: 700; font-family: 'JetBrains Mono',monospace; color: #818CF8; line-height: 1; }
+  .timer-key { font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: .08em; }
+  .timer-sep { font-size: 28px; font-weight: 300; color: var(--border); margin-bottom: 6px; }
+  .timer-badge { margin-left: auto; padding: 6px 12px; background: var(--card); border: 1px solid var(--accent1); border-radius: 8px; font-size: 11px; color: #818CF8; font-weight: 600; white-space: nowrap; }
+  .timer-progress { margin-top: 12px; height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; }
+  .timer-bar { height: 100%; background: linear-gradient(90deg,var(--accent1),#818CF8); border-radius: 4px; transition: width 1s linear; }
   .gm-btn { width: 100%; margin-top: 28px; padding: 16px; background: linear-gradient(135deg,var(--accent1),var(--accent2)); border: none; border-radius: 12px; color: #fff; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; letter-spacing: .04em; transition: opacity .2s,transform .1s,box-shadow .2s; }
   .gm-btn:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 8px 32px var(--glow); }
   .gm-btn:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
@@ -142,6 +152,18 @@
         <div class="stat"><span class="stat-val" id="totalNum">—</span><span class="stat-key">Total GMs</span></div>
       </div>
     </div>
+    <div class="timer-box">
+      <div class="timer-label">Next GM in</div>
+      <div class="timer-digits">
+        <div class="timer-unit"><div class="timer-num" id="timerH">00</div><div class="timer-key">HRS</div></div>
+        <div class="timer-sep">:</div>
+        <div class="timer-unit"><div class="timer-num" id="timerM">00</div><div class="timer-key">MIN</div></div>
+        <div class="timer-sep">:</div>
+        <div class="timer-unit"><div class="timer-num" id="timerS">00</div><div class="timer-key">SEC</div></div>
+        <div class="timer-badge">resets 00:00 UTC</div>
+      </div>
+      <div class="timer-progress"><div class="timer-bar" id="timerBar" style="width:0%"></div></div>
+    </div>
     <button class="gm-btn" id="gmBtn" onclick="checkIn()" disabled>Connect wallet to GM</button>
     <a class="tx-link" id="gmTxLink" target="_blank"></a>
   </div>
@@ -184,6 +206,7 @@
     <button class="btn-x402" id="supportBtn" onclick="paySupport()">Support 0.01 USDC →</button>
   </div>
   <div id="supportResult" style="display:none;background:var(--card);border:1px solid var(--success);border-radius:12px;padding:14px 20px;margin-bottom:20px;color:var(--success);font-size:14px;text-align:center;"></div>
+  <p style="font-size:11px;color:var(--muted);text-align:center;margin-bottom:20px;padding:0 10px;">⚠️ Your wallet may show a security warning — this is normal for new x402 apps. The 0.01 USDC goes directly to Basecheck on Base mainnet.</p>
 
 </div>
 
@@ -472,6 +495,24 @@ function showToast(msg, type = "info") {
 }
 
 // ── AUTO CONNECT ──────────────────────────────────────────────────
+function startTimer() {
+  function tick() {
+    const now = new Date();
+    const totalNow = now.getUTCHours()*3600 + now.getUTCMinutes()*60 + now.getUTCSeconds();
+    const left = 86400 - totalNow;
+    const h = Math.floor(left/3600);
+    const m = Math.floor((left%3600)/60);
+    const s = left%60;
+    document.getElementById('timerH').textContent = String(h).padStart(2,'0');
+    document.getElementById('timerM').textContent = String(m).padStart(2,'0');
+    document.getElementById('timerS').textContent = String(s).padStart(2,'0');
+    document.getElementById('timerBar').style.width = ((totalNow/86400)*100) + '%';
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+startTimer();
+
 window.addEventListener("load", async () => {
   if (window.ethereum) {
     window.ethereum.on("accountsChanged", () => location.reload());
