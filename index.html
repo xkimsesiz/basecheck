@@ -475,7 +475,8 @@ async function paySupport() {
       const el = document.getElementById('supportResult');
       el.textContent = result.message || 'Thank you for supporting Basecheck!';
       el.style.display = 'block';
-      btn.textContent = 'Supported! ✅';
+      btn.textContent = 'Support again ✅';
+      btn.disabled = false;
       showToast('Thank you for supporting Basecheck!', 'success');
     } else {
       throw new Error('Payment failed');
