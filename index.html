@@ -397,7 +397,20 @@ async function paySupport() {
       btn.textContent = 'Support 0.01 USDC →';
       return;
     }
-    const paymentRequired = JSON.parse(probe.headers.get('PAYMENT-REQUIRED') || probe.headers.get('payment-required') || '{}');
+    const rawHeader = probe.headers.get('PAYMENT-REQUIRED') || probe.headers.get('payment-required') || '';
+    let paymentRequired;
+    try {
+      // Try base64 decode first
+      paymentRequired = JSON.parse(atob(rawHeader));
+    } catch {
+      // Fallback: direct JSON parse
+      paymentRequired = JSON.parse(rawHeader || '{}');
+    }
+    // Also try response body as fallback
+    if (!paymentRequired.accepts) {
+      const body = await probe.json().catch(() => ({}));
+      if (body.accepts) paymentRequired = body;
+    }
     const accept = paymentRequired.accepts?.[0];
     if (!accept) {
       showToast('Could not read payment requirements', 'error');
