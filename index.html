@@ -321,25 +321,7 @@ function setBadge(id, earned) {
   el.classList.add(earned ? "earned" : "locked");
 }
 
-async function claimStreakBadge(badgeId) {
-  const btn = document.getElementById("claimBtn" + badgeId);
-  btn.disabled = true;
-  btn.textContent = "Claiming...";
-  try {
-    // Streak badges are auto-minted on checkIn – nothing to claim here
-    showToast("Streak badges are earned automatically on GM check-in!", "info");
-    btn.disabled = false;
-    btn.textContent = "Earned on GM";
-    return;
-    showToast("Badge claimed!", "success");
-    await tx.wait();
-    await loadBadges();
-  } catch(e) {
-    showToast(e.reason || e.message || "Claim failed", "error");
-    btn.disabled = false;
-    btn.textContent = "Claim";
-  }
-}
+
 
 // ── CHECK IN ─────────────────────────────────────────────────────
 async function checkIn() {
@@ -380,7 +362,6 @@ async function deployContract() {
     link.href = EXPLORER + "/address/" + deployedContractAddress;
     link.textContent = "View contract ↗ " + deployedContractAddress.slice(0,20) + "...";
     link.classList.add("show");
-    document.getElementById("claimBadgeBtn").disabled = false;
     btn.textContent = "Deployed ✓";
     showToast("Contract deployed! Now claim your badge.", "success");
   } catch(e) {
@@ -389,24 +370,7 @@ async function deployContract() {
   }
 }
 
-// ── CLAIM BADGE ───────────────────────────────────────────────────
-async function claimDeployBadge() {
-  if (!deployedContractAddress) return;
-  const btn = document.getElementById("claimBadgeBtn");
-  btn.disabled = true; btn.textContent = "Claiming...";
-  try {
-    const tx = await sendWithBuilderCode(hubContract, "claimDeployBadge", [deployedContractAddress]);
-    showToast("Badge claimed! 🔨", "success");
-    await tx.wait();
-    document.getElementById("step2Num").classList.add("done");
-    document.getElementById("step2Num").textContent = "✓";
-    await loadBadges();
-    btn.textContent = "Badge Claimed ✓";
-  } catch(e) {
-    showToast(e.reason || e.message || "Claim failed", "error");
-    btn.disabled = false; btn.textContent = "Claim Badge";
-  }
-}
+
 
 // ── BUILDER CODE TX HELPER ───────────────────────────────────────
 async function sendWithBuilderCode(contract, method, args = []) {
