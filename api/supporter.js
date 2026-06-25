@@ -1,5 +1,6 @@
 /**
  * Basecheck x402 Supporter - Vercel API Route
+ * Verwendet @coinbase/cdp-sdk für JWT Auth
  */
 
 const PAY_TO = process.env.PAY_TO;
@@ -30,44 +31,27 @@ const CORS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 };
 
-async function generateCDPJWT() {
-  const rawKey = Buffer.from(CDP_API_KEY_SECRET.trim(), "base64");
-  const pkcs8Prefix = Buffer.from(
-    "3041020100301306072a8648ce3d020106082a8648ce3d030107042730250201010420",
-    "hex"
-  );
-  const pkcs8Key = Buffer.concat([pkcs8Prefix, rawKey]);
-
-  const privateKey = await crypto.subtle.importKey(
-    "pkcs8",
-    pkcs8Key,
-    { name: "ECDSA", namedCurve: "P-256" },
-    false,
-    ["sign"]
-  );
-
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "ES256", kid: CDP_API_KEY_ID };
-  const payload = { sub: CDP_API_KEY_ID, iss: "cdp", nbf: now, exp: now + 120 };
-
-  const h = Buffer.from(JSON.stringify(header)).toString("base64url");
-  const p = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sigInput = `${h}.${p}`;
-
-  const sig = await crypto.subtle.sign(
-    { name: "ECDSA", hash: "SHA-256" },
-    privateKey,
-    Buffer.from(sigInput)
-  );
-
-  return `${sigInput}.${Buffer.from(sig).toString("base64url")}`;
+async function generateJWT(method, path) {
+  const { generateJwt } = await import("@coinbase/cdp-sdk/auth");
+  return generateJwt({
+    apiKeyId: CDP_API_KEY_ID,
+    apiKeySecret: CDP_API_KEY_SECRET,
+    requestMethod: method,
+    requestHost: "api.cdp.coinbase.com",
+    requestPath: path,
+    expiresIn: 120,
+  });
 }
 
 async function callFacilitator(endpoint, body) {
-  const jwt = await generateCDPJWT();
-  const res = await fetch(`${FACILITATOR_URL}/${endpoint}`, {
+  const path = `/platform/v2/x402/${endpoint}`;
+  const jwt = await generateJWT("POST", path);
+  const res = await fetch(`https://api.cdp.coinbase.com${path}`, {
     method: "POST",
-    headers: { "Authorization": `Bearer ${jwt}`, "Content-Type": "application/json" },
+    headers: {
+      "Authorization": `Bearer ${jwt}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify(body),
   });
   const text = await res.text();
@@ -75,18 +59,13 @@ async function callFacilitator(endpoint, body) {
 }
 
 export default async function handler(req, res) {
-  // CORS
   Object.entries(CORS).forEach(([k, v]) => res.setHeader(k, v));
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+  if (req.method === "OPTIONS") return res.status(200).end();
 
   const paymentHeader =
     req.headers["payment-signature"] ||
-    req.headers["PAYMENT-SIGNATURE"] ||
-    req.headers["x-payment"] ||
-    req.headers["X-PAYMENT"];
+    req.headers["x-payment"];
 
   if (!paymentHeader) {
     res.setHeader("PAYMENT-REQUIRED", Buffer.from(JSON.stringify({
@@ -105,7 +84,6 @@ export default async function handler(req, res) {
       payment,
       paymentRequirements: PAYMENT_REQUIREMENTS,
     });
-
     console.log("Verify:", JSON.stringify(verified));
 
     if (!verified.isValid) {
@@ -116,7 +94,6 @@ export default async function handler(req, res) {
       payment,
       paymentRequirements: PAYMENT_REQUIREMENTS,
     });
-
     console.log("Settle:", JSON.stringify(settled));
 
     return res.status(200).json({
