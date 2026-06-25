@@ -332,7 +332,11 @@ async function deployContract() {
     const factory  = new ethers.ContractFactory(GMBOARD_ABI, GMBOARD_BYTECODE, signer);
     const contract = await factory.deploy();
     showToast("Deploying your contract...", "info");
-    await contract.waitForDeployment();
+    // Timeout nach 60 Sekunden
+    await Promise.race([
+      contract.waitForDeployment(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Deploy timeout – check Basescan for your contract')), 60000))
+    ]);
     deployedContractAddress = await contract.getAddress();
     const addrBox = document.getElementById("deployedAddr");
     addrBox.textContent = deployedContractAddress;
