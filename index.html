@@ -390,7 +390,7 @@ async function paySupport() {
   btn.textContent = 'Processing...';
   try {
     // Step 1: Probe endpoint to get payment requirements
-    const probe = await fetch('https://basecheck.netlify.app/support');
+    const probe = await fetch('https://basecheck.vercel.app/api/supporter');
     if (probe.status !== 402) {
       showToast('Unexpected response from server', 'error');
       btn.disabled = false;
@@ -475,7 +475,7 @@ async function paySupport() {
 
     // Step 4: Send payment
     showToast('Sending payment...', 'info');
-    const paid = await fetch('https://basecheck.netlify.app/support', {
+    const paid = await fetch('https://basecheck.vercel.app/api/supporter', {
       headers: {
         'PAYMENT-SIGNATURE': btoa(JSON.stringify(paymentPayload)),
         'Content-Type': 'application/json'
