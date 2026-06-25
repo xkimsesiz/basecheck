@@ -288,8 +288,8 @@ async function loadBadges() {
       hubContract.balanceOf(userAddress, 2),
       hubContract.balanceOf(userAddress, 3),
     ]);
-    if (b1 > 0n) { setBadge("badge1", true); document.getElementById("hint1").textContent = "Earned!"; }
-    else { document.getElementById("hint1").textContent = info.totalGms > 0n ? info.totalGms + " GM sent" : "Send 1 GM"; }
+    if (b1 > 0n || info.totalGms >= 1n) { setBadge("badge1", true); document.getElementById("hint1").textContent = "Earned!"; }
+    else { document.getElementById("hint1").textContent = "Send 1 GM"; }
     if (b2 > 0n) { setBadge("badge2", true); document.getElementById("hint2").textContent = "Earned!"; }
     else { document.getElementById("hint2").textContent = info.current + "/7 days"; }
     if (b3 > 0n) { setBadge("badge3", true); document.getElementById("hint3").textContent = "Earned!"; }
@@ -345,7 +345,7 @@ async function deployContract() {
     link.classList.add("show");
     btn.textContent = "Deploy Again";
     btn.disabled = false;
-    showToast("Contract deployed! Now claim your badge.", "success");
+    showToast("Contract deployed! ✅", "success");
   } catch(e) {
     showToast(e.reason || e.message || "Deploy failed", "error");
     btn.disabled = false; btn.textContent = "Deploy Contract";
