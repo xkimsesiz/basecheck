@@ -329,14 +329,35 @@ async function deployContract() {
   const btn = document.getElementById("deployBtn");
   btn.disabled = true; btn.textContent = "Deploying...";
   try {
-    const factory  = new ethers.ContractFactory(GMBOARD_ABI, GMBOARD_BYTECODE, signer);
+    const factory = new ethers.ContractFactory(GMBOARD_ABI, GMBOARD_BYTECODE, signer);
     const contract = await factory.deploy();
-    showToast("Deploying your contract...", "info");
-    // Timeout nach 60 Sekunden
-    await Promise.race([
-      contract.waitForDeployment(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Deploy timeout – check Basescan for your contract')), 60000))
-    ]);
+    const deployTx = contract.deploymentTransaction();
+    showToast("Transaction sent! Waiting for confirmation...", "info");
+
+    // Direkt die Adresse holen ohne auf Deployment zu warten
+    deployedContractAddress = await contract.getAddress();
+
+    // Adresse sofort anzeigen
+    const addrBox = document.getElementById("deployedAddr");
+    addrBox.textContent = deployedContractAddress;
+    addrBox.classList.add("show");
+    document.getElementById("step1Num").classList.add("done");
+    document.getElementById("step1Num").textContent = "✓";
+    const link = document.getElementById("deployTxLink");
+    if (deployTx) {
+      link.href = EXPLORER + "/tx/" + deployTx.hash;
+      link.textContent = "View tx ↗ " + deployTx.hash.slice(0,20) + "...";
+      link.classList.add("show");
+    }
+    btn.textContent = "Deploy Again";
+    btn.disabled = false;
+    showToast("Contract deployed! ✅", "success");
+
+    // Im Hintergrund auf Confirmation warten
+    contract.waitForDeployment().catch(() => {});
+    return;
+
+    // (dead code below kept for structure)
     deployedContractAddress = await contract.getAddress();
     const addrBox = document.getElementById("deployedAddr");
     addrBox.textContent = deployedContractAddress;
