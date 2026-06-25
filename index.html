@@ -327,50 +327,44 @@ async function checkIn() {
 // ── DEPLOY CONTRACT ───────────────────────────────────────────────
 async function deployContract() {
   const btn = document.getElementById("deployBtn");
-  btn.disabled = true; btn.textContent = "Deploying...";
+  btn.disabled = true;
+  btn.textContent = "Sign in wallet...";
   try {
-    const factory = new ethers.ContractFactory(GMBOARD_ABI, GMBOARD_BYTECODE, signer);
-    const contract = await factory.deploy();
-    const deployTx = contract.deploymentTransaction();
-    showToast("Transaction sent! Waiting for confirmation...", "info");
+    // TX manuell bauen und senden
+    const iface = new ethers.Interface(GMBOARD_ABI);
+    const deployData = ethers.concat([
+      ethers.getBytes(GMBOARD_BYTECODE),
+      iface.encodeDeploy([])
+    ]);
 
-    // Direkt die Adresse holen ohne auf Deployment zu warten
-    deployedContractAddress = await contract.getAddress();
+    btn.textContent = "Deploying...";
+    const tx = await signer.sendTransaction({ data: deployData });
 
-    // Adresse sofort anzeigen
+    // Contract Adresse sofort berechnen (deterministisch aus sender + nonce)
+    deployedContractAddress = ethers.getCreateAddress({
+      from: userAddress,
+      nonce: tx.nonce
+    });
+
+    // Sofort anzeigen
     const addrBox = document.getElementById("deployedAddr");
     addrBox.textContent = deployedContractAddress;
     addrBox.classList.add("show");
     document.getElementById("step1Num").classList.add("done");
-    document.getElementById("step1Num").textContent = "✓";
+    document.getElementById("step1Num").textContent = "\u2713";
     const link = document.getElementById("deployTxLink");
-    if (deployTx) {
-      link.href = EXPLORER + "/tx/" + deployTx.hash;
-      link.textContent = "View tx ↗ " + deployTx.hash.slice(0,20) + "...";
-      link.classList.add("show");
-    }
-    btn.textContent = "Deploy Again";
-    btn.disabled = false;
-    showToast("Contract deployed! ✅", "success");
-
-    // Im Hintergrund auf Confirmation warten
-    contract.waitForDeployment().catch(() => {});
-    return;
-
-    // (dead code below kept for structure)
-    deployedContractAddress = await contract.getAddress();
-    const addrBox = document.getElementById("deployedAddr");
-    addrBox.textContent = deployedContractAddress;
-    addrBox.classList.add("show");
-    document.getElementById("step1Num").classList.add("done");
-    document.getElementById("step1Num").textContent = "✓";
-    const link = document.getElementById("deployTxLink");
-    link.href = EXPLORER + "/address/" + deployedContractAddress;
-    link.textContent = "View contract ↗ " + deployedContractAddress.slice(0,20) + "...";
+    link.href = EXPLORER + "/tx/" + tx.hash;
+    link.textContent = "View tx \u2197 " + tx.hash.slice(0,20) + "...";
     link.classList.add("show");
     btn.textContent = "Deploy Again";
     btn.disabled = false;
-    showToast("Contract deployed! ✅", "success");
+    showToast("Contract deployed! \u2705", "success");
+
+  } catch(e) {
+    showToast(e.reason || e.message || "Deploy failed", "error");
+    btn.disabled = false;
+    btn.textContent = "Deploy Contract";
+  }
   } catch(e) {
     showToast(e.reason || e.message || "Deploy failed", "error");
     btn.disabled = false; btn.textContent = "Deploy Contract";
