@@ -105,14 +105,7 @@
   .btn-secondary:hover { border-color: var(--accent1); }
   .btn-secondary:disabled { opacity: .35; cursor: not-allowed; }
 
-  /* x402 Banner */
-  .x402-banner { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px 24px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .x402-info { display: flex; align-items: center; gap: 12px; }
-  .x402-icon { font-size: 24px; }
-  .x402-text { font-size: 13px; color: var(--muted); line-height: 1.5; }
-  .x402-text strong { color: var(--text); font-size: 14px; display: block; margin-bottom: 2px; }
-  .btn-x402 { white-space: nowrap; padding: 10px 20px; border-radius: 10px; border: 1px solid var(--accent1); background: transparent; color: var(--accent1); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; text-decoration: none; display: inline-block; }
-  .btn-x402:hover { background: var(--accent1); color: #fff; }
+
 
   .tx-link { font-size: 12px; color: var(--accent1); font-family: 'JetBrains Mono',monospace; text-decoration: none; display: none; margin-top: 10px; word-break: break-all; }
   .tx-link.show { display: block; }
@@ -204,19 +197,7 @@
     </div>
   </div>
 
-  <!-- x402 SUPPORTER -->
-  <div class="x402-banner">
-    <div class="x402-info">
-      <div class="x402-icon">⚡</div>
-      <div class="x402-text">
-        <strong>Support Basecheck</strong>
-        Pay 0.01 USDC via x402 — instant, onchain, no signup needed.
-      </div>
-    </div>
-    <button class="btn-x402" id="supportBtn" onclick="paySupport()">Support 0.01 USDC →</button>
-  </div>
-  <div id="supportResult" style="display:none;background:var(--card);border:1px solid var(--success);border-radius:12px;padding:14px 20px;margin-bottom:20px;color:var(--success);font-size:14px;text-align:center;"></div>
-  <p style="font-size:13px;color:var(--text);text-align:center;margin-bottom:20px;padding:0 10px;line-height:1.6;">⚠️ Your wallet may show a security warning — this is normal for new x402 apps. The 0.01 USDC goes directly to Basecheck on Base mainnet.</p>
+
 
 </div>
 
@@ -382,123 +363,7 @@ async function sendWithBuilderCode(contract, method, args = []) {
   return await signer.sendTransaction(pop);
 }
 
-// ── x402 SUPPORTER PAYMENT ──────────────────────────────────────
-async function paySupport() {
-  if (!signer) { showToast('Connect wallet first', 'error'); return; }
-  const btn = document.getElementById('supportBtn');
-  btn.disabled = true;
-  btn.textContent = 'Processing...';
-  try {
-    // Step 1: Probe endpoint to get payment requirements
-    const probe = await fetch('https://basecheck.vercel.app/api/supporter');
-    if (probe.status !== 402) {
-      showToast('Unexpected response from server', 'error');
-      btn.disabled = false;
-      btn.textContent = 'Support 0.01 USDC →';
-      return;
-    }
-    const rawHeader = probe.headers.get('PAYMENT-REQUIRED') || probe.headers.get('payment-required') || '';
-    let paymentRequired;
-    try {
-      // Try base64 decode first
-      paymentRequired = JSON.parse(atob(rawHeader));
-    } catch {
-      // Fallback: direct JSON parse
-      paymentRequired = JSON.parse(rawHeader || '{}');
-    }
-    // Also try response body as fallback
-    if (!paymentRequired.accepts) {
-      const body = await probe.json().catch(() => ({}));
-      if (body.accepts) paymentRequired = body;
-    }
-    const accept = paymentRequired.accepts?.[0];
-    if (!accept) {
-      showToast('Could not read payment requirements', 'error');
-      btn.disabled = false;
-      btn.textContent = 'Support 0.01 USDC →';
-      return;
-    }
 
-    // Step 2: Build EIP-3009 transferWithAuthorization for USDC
-    const USDC = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-    const amount = BigInt(accept.maxAmountRequired || '10000');
-    const validAfter = BigInt(0);
-    const validBefore = BigInt(Math.floor(Date.now() / 1000) + 60);
-    const nonce = ethers.hexlify(ethers.randomBytes(32));
-
-    const domain = {
-      name: 'USD Coin',
-      version: '2',
-      chainId: 8453,
-      verifyingContract: USDC
-    };
-    const types = {
-      TransferWithAuthorization: [
-        { name: 'from', type: 'address' },
-        { name: 'to', type: 'address' },
-        { name: 'value', type: 'uint256' },
-        { name: 'validAfter', type: 'uint256' },
-        { name: 'validBefore', type: 'uint256' },
-        { name: 'nonce', type: 'bytes32' }
-      ]
-    };
-    const message = {
-      from: userAddress,
-      to: accept.payTo,
-      value: amount,
-      validAfter: validAfter,
-      validBefore: validBefore,
-      nonce: nonce
-    };
-
-    showToast('Please sign in your wallet...', 'info');
-    const signature = await signer.signTypedData(domain, types, message);
-    const { v, r, s } = ethers.Signature.from(signature);
-
-    // Step 3: Build payment payload
-    const paymentPayload = {
-      x402Version: 1,
-      scheme: 'exact',
-      network: 'eip155:8453',
-      payload: {
-        signature,
-        authorization: {
-          from: userAddress,
-          to: accept.payTo,
-          value: amount.toString(),
-          validAfter: validAfter.toString(),
-          validBefore: validBefore.toString(),
-          nonce
-        }
-      }
-    };
-
-    // Step 4: Send payment
-    showToast('Sending payment...', 'info');
-    const paid = await fetch('https://basecheck.vercel.app/api/supporter', {
-      headers: {
-        'PAYMENT-SIGNATURE': btoa(JSON.stringify(paymentPayload)),
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (paid.ok) {
-      const result = await paid.json();
-      const el = document.getElementById('supportResult');
-      el.textContent = result.message || 'Thank you for supporting Basecheck!';
-      el.style.display = 'block';
-      btn.textContent = 'Support again ✅';
-      btn.disabled = false;
-      showToast('Thank you for supporting Basecheck!', 'success');
-    } else {
-      throw new Error('Payment failed');
-    }
-  } catch(e) {
-    showToast(e.message || 'Payment failed', 'error');
-    btn.disabled = false;
-    btn.textContent = 'Support 0.01 USDC →';
-  }
-}
 
 // ── TOAST ─────────────────────────────────────────────────────────
 function showToast(msg, type = "info") {
